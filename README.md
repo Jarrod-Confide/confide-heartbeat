@@ -1,4 +1,4 @@
-# Uptime Monitor
+# Confide Heartbeat
 
 Cloudflare Worker that pings every Confide service every minute and posts to `#system-status` in Slack on state transitions.
 

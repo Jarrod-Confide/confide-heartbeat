@@ -1,4 +1,4 @@
-# Cloudflare Workers config for the uptime monitor.
+# Cloudflare Workers config for Confide Heartbeat.
 #
 # Setup (one-time):
 #   1. wrangler login                              # opens browser, authorizes CF account
@@ -13,7 +13,7 @@
 #   - Edit secrets via wrangler secret put.
 #   - Watch live logs via npm run tail.
 
-name = "uptime-monitor"
+name = "confide-heartbeat"
 main = "src/index.ts"
 compatibility_date = "2024-09-25"
 workers_dev = true                # gives you a worker.dev URL for manual /check tests

@@ -1,4 +1,5 @@
-// Cloudflare Worker — uptime monitor for Confide services.
+// Cloudflare Worker — Confide Heartbeat.
+// Uptime monitor for every Confide service.
 //
 // Runs on a 1-minute cron (configured in wrangler.toml). On each tick:
 //   1. Fetches every target in src/targets.ts in parallel.
@@ -138,8 +139,8 @@ async function postSlack(url: string, text: string) {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         text,
-        username: 'Uptime Monitor',
-        icon_emoji: ':satellite_antenna:',
+        username: 'Confide Heartbeat',
+        icon_emoji: ':heartbeat:',
       }),
     });
   } catch (err) {

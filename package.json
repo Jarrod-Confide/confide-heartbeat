@@ -1,8 +1,8 @@
 {
-  "name": "uptime-monitor",
+  "name": "confide-heartbeat",
   "version": "0.1.0",
   "private": true,
-  "description": "Cloudflare Workers cron-based uptime monitor for Confide services. Posts to #system-status on state transitions.",
+  "description": "Confide Heartbeat — Cloudflare Workers cron-based uptime monitor for Confide services. Posts to #system-status on state transitions.",
   "scripts": {
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
