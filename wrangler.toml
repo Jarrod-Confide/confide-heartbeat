@@ -27,7 +27,7 @@ crons = ["* * * * *"]
 # Run `wrangler kv namespace create STATE` and paste the resulting id here.
 [[kv_namespaces]]
 binding = "STATE"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
+id = "15468c059f1e4aaabe23187744ff237b"
 
 [observability]
 enabled = true
