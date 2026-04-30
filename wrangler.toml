@@ -1,0 +1,33 @@
+# Cloudflare Workers config for the uptime monitor.
+#
+# Setup (one-time):
+#   1. wrangler login                              # opens browser, authorizes CF account
+#   2. wrangler kv namespace create STATE          # creates the KV namespace
+#      → copy the id it prints
+#   3. paste the id into the kv_namespaces[0].id below
+#   4. wrangler secret put ALERT_SLACK_WEBHOOK_URL # paste webhook URL when prompted
+#   5. npm run deploy                              # ships the worker
+#
+# After setup:
+#   - Edit src/targets.ts to add/remove monitored services, npm run deploy.
+#   - Edit secrets via wrangler secret put.
+#   - Watch live logs via npm run tail.
+
+name = "uptime-monitor"
+main = "src/index.ts"
+compatibility_date = "2024-09-25"
+workers_dev = true                # gives you a worker.dev URL for manual /check tests
+
+# Cron trigger — every minute.
+# Cloudflare's cron syntax mirrors standard cron (5 fields).
+[triggers]
+crons = ["* * * * *"]
+
+# KV namespace for storing last-known state per target.
+# Run `wrangler kv namespace create STATE` and paste the resulting id here.
+[[kv_namespaces]]
+binding = "STATE"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+[observability]
+enabled = true
