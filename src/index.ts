@@ -104,13 +104,15 @@ async function checkOne(t: Target): Promise<CheckResult> {
 async function processResult(env: Env, r: CheckResult) {
   const stateKey = `state:${r.name}`;
   const lastKey = `last:${r.name}`;
-  await env.STATE.put(lastKey, JSON.stringify(r));
 
   const lastState = (await env.STATE.get(stateKey)) ?? 'unknown';
   const newState = r.ok ? 'up' : 'down';
   if (lastState === newState) return;
 
+  // Only write to KV on state transitions to stay within the free-tier
+  // write limit (1,000/day). Reads are cheap (100k/day); writes are not.
   await env.STATE.put(stateKey, newState);
+  await env.STATE.put(lastKey, JSON.stringify(r));
 
   // First-ever observation that's healthy — don't alert as if we just
   // recovered.
