@@ -48,5 +48,11 @@ export const TARGETS: Target[] = [
     expectBody: '"status":"ok"',
     timeout: 10_000,
   },
-  // Add more here as new services come online (e.g. eventflow when deployed).
+  {
+    name: 'eventflow',
+    // Root redirects to login (307) — confirms the app and Vercel are alive.
+    url: 'https://eventflow.confide.group/',
+    expectStatus: 307,
+    timeout: 10_000,
+  },
 ];
