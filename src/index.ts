@@ -72,6 +72,12 @@ async function checkOne(t: Target): Promise<CheckResult> {
     const res = await fetch(t.url, {
       method: 'GET',
       signal: ctrl.signal,
+      // Don't follow redirects: if a target intends to redirect (e.g.
+      // EventFlow's root → /sign-in), our `expectStatus` should match
+      // the 3xx, not the 200 from the redirect destination. Following
+      // redirects was hiding eventflow's actual response and producing
+      // an undetected up/down mismatch.
+      redirect: 'manual',
       cf: { cacheTtl: 0, cacheEverything: false },
     });
     clearTimeout(timer);
