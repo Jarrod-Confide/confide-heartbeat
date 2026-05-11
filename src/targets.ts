@@ -27,7 +27,12 @@ export interface Target {
 export const TARGETS: Target[] = [
   {
     name: 'slackle-web',
-    url: 'https://slackle-web-production.up.railway.app/healthz',
+    // /readyz checks DB, Redis, AND the Circle cable (with a 2-min grace
+    // so normal Circle restarts don't trip it). /healthz would just
+    // confirm the Node process is alive, which misses the failure mode
+    // we saw in the 5/9 → 5/11 cable outage where the process was up
+    // but the cable inside it was dead.
+    url: 'https://slackle-web-production.up.railway.app/readyz',
     expectStatus: 200,
     expectBody: '"ok":true',
     timeout: 10_000,
