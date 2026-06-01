@@ -35,7 +35,7 @@ export const TARGETS: Target[] = [
     url: 'https://slackle-web-production.up.railway.app/readyz',
     expectStatus: 200,
     expectBody: '"ok":true',
-    timeout: 10_000,
+    timeout: 15_000,
   },
   {
     name: 'slackle-mapping-ui',
@@ -44,20 +44,20 @@ export const TARGETS: Target[] = [
     // NextAuth setup gates it behind a session cookie.
     url: 'https://slackle-mapping-ui.vercel.app/sign-in',
     expectStatus: 200,
-    timeout: 10_000,
+    timeout: 15_000,
   },
   {
     name: 'circlehub',
     url: 'https://circlehub-pi.vercel.app/api/health',
     expectStatus: 200,
     expectBody: '"status":"ok"',
-    timeout: 10_000,
+    timeout: 15_000,
   },
   {
     name: 'eventflow',
     // Root redirects to login (307) — confirms the app and Vercel are alive.
     url: 'https://eventflow.confide.group/',
     expectStatus: 307,
-    timeout: 10_000,
+    timeout: 15_000,
   },
 ];

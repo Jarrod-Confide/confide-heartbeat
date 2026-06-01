@@ -12,12 +12,34 @@
 //   GET /check    — runs a check synchronously and returns JSON (manual probe)
 //
 // State in KV:
-//   state:<name>  =  "up" | "down"
-//   last:<name>   =  JSON snapshot of the most recent CheckResult
+//   state:<name>      =  "up" | "down"
+//   last:<name>       =  JSON snapshot of the most recent CheckResult
+//   pending_fails:<n> =  count of consecutive failed ticks while state is "up"
+//                        (caps at DOWN_THRESHOLD so a long outage doesn't burn
+//                        KV write budget)
 //
 // "unknown" → "up" transitions are NOT alerted (avoids a fake "back up"
 // message every time a target's state is first written). Genuine
 // transitions in either direction always alert.
+//
+// Noise suppression:
+//   1. checkOne retries once with a tighter timeout on the first failure
+//      before declaring the probe bad. Catches transient blips inside a
+//      single cron tick (CF edge DNS hiccup, brief egress queueing).
+//   2. UP → DOWN requires DOWN_THRESHOLD consecutive failed ticks before
+//      we transition and alert. DOWN → UP is still instant so recovery
+//      notifications stay snappy.
+//   3. Default timeout is 15s (was 10s). The endpoints we probe do real
+//      work (DB + Redis + cable checks for Slackle's /readyz, Next.js
+//      middleware for the Vercel apps) — 10s was tight enough to false-
+//      positive whenever a target was warming up.
+//
+// Trade-off: a *real* sustained outage now alerts in 2 minutes instead
+// of 1. Acceptable; recovery alerts are still 1-tick.
+
+const DOWN_THRESHOLD = 2;
+const DEFAULT_TIMEOUT_MS = 15_000;
+const RETRY_TIMEOUT_MS = 5_000;
 
 import { TARGETS, type Target } from './targets';
 
@@ -64,11 +86,28 @@ async function runAll(env: Env): Promise<CheckResult[]> {
 }
 
 async function checkOne(t: Target): Promise<CheckResult> {
+  // First attempt at the configured timeout (default 15s).
+  const first = await probeOnce(t, t.timeout ?? DEFAULT_TIMEOUT_MS);
+  if (first.ok) return first;
+  // Single retry on failure. Most flaps we've seen are transient CF-edge
+  // timeouts that resolve in a second or two — a quick retry eats them
+  // without doubling our alert latency on real outages. Tighter timeout
+  // (5s) so the worker still finishes well within its 30s budget even
+  // when all targets fail and all retry.
+  const second = await probeOnce(t, RETRY_TIMEOUT_MS);
+  if (second.ok) return second;
+  // Both attempts failed — return the first result, since its error is
+  // typically more representative (the retry's 5s timeout would mask a
+  // slow-but-eventually-responding target as a fast failure).
+  return first;
+}
+
+async function probeOnce(t: Target, timeoutMs: number): Promise<CheckResult> {
   const start = Date.now();
   const ts = new Date().toISOString();
   try {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), t.timeout ?? 10_000);
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     const res = await fetch(t.url, {
       method: 'GET',
       signal: ctrl.signal,
@@ -110,22 +149,48 @@ async function checkOne(t: Target): Promise<CheckResult> {
 async function processResult(env: Env, r: CheckResult) {
   const stateKey = `state:${r.name}`;
   const lastKey = `last:${r.name}`;
+  const pendingKey = `pending_fails:${r.name}`;
 
   const lastState = (await env.STATE.get(stateKey)) ?? 'unknown';
-  const newState = r.ok ? 'up' : 'down';
-  if (lastState === newState) return;
+  const pendingFails = Number((await env.STATE.get(pendingKey)) ?? '0');
 
-  // Only write to KV on state transitions to stay within the free-tier
-  // write limit (1,000/day). Reads are cheap (100k/day); writes are not.
-  await env.STATE.put(stateKey, newState);
+  // ── Successful probe ────────────────────────────────────────────────────
+  if (r.ok) {
+    // Clear any pending-fail counter so a single recovery erases the
+    // half-step toward DOWN. This is the "blip" case — one bad tick
+    // followed by a good one, no alert ever fires.
+    if (pendingFails > 0) await env.STATE.put(pendingKey, '0');
+
+    if (lastState === 'up') return; // stable up — no writes, no alert
+    if (lastState === 'unknown') {
+      await env.STATE.put(stateKey, 'up'); // first-ever observation — no alert
+      return;
+    }
+    // lastState === 'down' → genuine recovery
+    await env.STATE.put(stateKey, 'up');
+    await env.STATE.put(lastKey, JSON.stringify(r));
+    await postSlack(env.ALERT_SLACK_WEBHOOK_URL, formatAlert(r, 'up'));
+    return;
+  }
+
+  // ── Failed probe ────────────────────────────────────────────────────────
+  if (lastState === 'down') return; // already alerted; nothing new
+  // We're either UP or unknown. Bump the pending counter toward DOWN.
+  const newPending = Math.min(pendingFails + 1, DOWN_THRESHOLD);
+  if (newPending < DOWN_THRESHOLD) {
+    // Not enough consecutive failures yet — record the half-step but
+    // don't alert. Next tick decides.
+    await env.STATE.put(pendingKey, String(newPending));
+    return;
+  }
+  // Threshold met. Transition to DOWN and alert.
+  await env.STATE.put(stateKey, 'down');
   await env.STATE.put(lastKey, JSON.stringify(r));
-
-  // First-ever observation that's healthy — don't alert as if we just
-  // recovered.
-  if (lastState === 'unknown' && newState === 'up') return;
-
-  const text = formatAlert(r, newState);
-  await postSlack(env.ALERT_SLACK_WEBHOOK_URL, text);
+  // Cap the counter at threshold so a sustained outage stops burning writes.
+  if (pendingFails !== DOWN_THRESHOLD) {
+    await env.STATE.put(pendingKey, String(DOWN_THRESHOLD));
+  }
+  await postSlack(env.ALERT_SLACK_WEBHOOK_URL, formatAlert(r, 'down'));
 }
 
 function formatAlert(r: CheckResult, newState: 'up' | 'down'): string {
