@@ -60,4 +60,45 @@ export const TARGETS: Target[] = [
     expectStatus: 307,
     timeout: 15_000,
   },
+  {
+    name: 'meq',
+    // Purpose-built health route (public in middleware) that pings all three
+    // DBs — meq, eventflow, slackle — and returns 200 {"ok":true} only if
+    // every dependency is reachable, else 503. Catches DB outages, not just
+    // "is the Next.js process alive".
+    url: 'https://meq.confide.group/api/health',
+    expectStatus: 200,
+    expectBody: '"ok":true',
+    timeout: 15_000,
+  },
+  {
+    name: 'catalyst',
+    // Customer-facing, so an outage here is seen by CISOs and vendors, not
+    // just staff. /api/health checks the Supabase connection and returns
+    // {"ok":true,"db":"up"}, so a dead pooler trips it, not just a dead app.
+    url: 'https://catalyst.confide.group/api/health',
+    expectStatus: 200,
+    expectBody: '"ok":true',
+    timeout: 15_000,
+  },
+  {
+    name: 'pulse',
+    // Same health route shape as Catalyst. Pulse is a dependency of the other
+    // apps' feedback flows, so its outages are felt second-hand elsewhere.
+    url: 'https://pulse.confide.group/api/health',
+    expectStatus: 200,
+    expectBody: '"ok":true',
+    timeout: 15_000,
+  },
+  {
+    name: 'confide-apps',
+    // The apps.confide.group directory. It has no database, so the health
+    // route only proves the app is serving -- which is all there is to prove.
+    // It also renders this worker's own status snapshot, so when it is down
+    // the estate loses its status page as well as its launcher.
+    url: 'https://apps.confide.group/api/health',
+    expectStatus: 200,
+    expectBody: '"ok":true',
+    timeout: 15_000,
+  },
 ];
