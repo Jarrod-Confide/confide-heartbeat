@@ -4,11 +4,17 @@ Cloudflare Worker that pings every Confide service every minute and posts to `#s
 
 ## What it monitors
 
-See `src/targets.ts` for the live list. Initial set:
+`src/targets.ts` is the source of truth. Current set:
 
-- `slackle-web` — Slackle backend on Railway (`/healthz`)
+- `slackle-web` — Slackle backend on Railway (`/readyz` — checks DB, Redis, Circle cable)
 - `slackle-mapping-ui` — Slackle admin UI on Vercel (`/sign-in`)
 - `circlehub` — HubSpot ↔ Circle sync on Vercel (`/api/health`)
+- `eventflow` — EventFlow staff ops app on Vercel (root, expects 307 → `/sign-in`)
+- `event-registration` — public attendee registration host `events.thecisosociety.com` (root; expects a 404 whose body contains `EventFlow`, so a platform outage is distinguishable from the app's own 404)
+- `meq` — MEQ on Vercel (`/api/health` — pings the meq, eventflow, and slackle DBs)
+- `catalyst` — customer-facing CISO↔vendor app on Vercel (`/api/health` — checks Supabase)
+- `pulse` — shared survey/feedback service on Vercel (`/api/health`)
+- `confide-apps` — `apps.confide.group` directory/launcher on Vercel (`/api/health`; also renders this worker's status snapshot)
 
 Add a new service: append a `Target` to `src/targets.ts`, run `npm run deploy`. Done.
 
