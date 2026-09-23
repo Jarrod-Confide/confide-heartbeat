@@ -61,6 +61,26 @@ export const TARGETS: Target[] = [
     timeout: 15_000,
   },
   {
+    name: 'event-registration',
+    // Public, attendee-facing registration domain (CISO Society branding),
+    // served by the EventFlow app on its own Vercel domain. This is the
+    // surface CISOs actually hit to register, distinct from the staff ops
+    // app at eventflow.confide.group (and its events.confide.group alias,
+    // which just 307s to the staff /sign-in).
+    //
+    // There's no stable /register or health route — registration lives at
+    // per-event slugs — so we probe the root. The app renders its OWN 404
+    // there (HTTP 404 with the EventFlow HTML shell), which proves the app
+    // is up and serving. We therefore expect 404 AND require the EventFlow
+    // marker in the body: a genuine outage returns a *different* 404
+    // (Vercel's DEPLOYMENT_NOT_FOUND, no EventFlow HTML) or a 5xx, both of
+    // which fail this check.
+    url: 'https://events.thecisosociety.com/',
+    expectStatus: 404,
+    expectBody: 'EventFlow',
+    timeout: 15_000,
+  },
+  {
     name: 'meq',
     // Purpose-built health route (public in middleware) that pings all three
     // DBs — meq, eventflow, slackle — and returns 200 {"ok":true} only if
