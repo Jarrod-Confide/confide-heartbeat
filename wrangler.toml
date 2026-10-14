@@ -29,5 +29,10 @@ crons = ["* * * * *"]
 binding = "STATE"
 id = "15468c059f1e4aaabe23187744ff237b"
 
+# #system-status. The Status Alerts bot token is a secret:
+#   npx wrangler secret put SLACK_ALERTS_BOT_TOKEN
+[vars]
+SLACK_ALERTS_CHANNEL_ID = "C0AVCJD0XSB"
+
 [observability]
 enabled = true
