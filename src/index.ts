@@ -46,6 +46,10 @@ import { TARGETS, type Target } from './targets';
 interface Env {
   STATE: KVNamespace;
   ALERT_SLACK_WEBHOOK_URL: string;
+  // Shared Confide "Status Alerts" bot (secret) + #system-status channel id
+  // (wrangler.toml var). Preferred over the webhook so posts carry our name.
+  SLACK_ALERTS_BOT_TOKEN?: string;
+  SLACK_ALERTS_CHANNEL_ID?: string;
 }
 
 interface CheckResult {
@@ -169,7 +173,7 @@ async function processResult(env: Env, r: CheckResult) {
     // lastState === 'down' → genuine recovery
     await env.STATE.put(stateKey, 'up');
     await env.STATE.put(lastKey, JSON.stringify(r));
-    await postSlack(env.ALERT_SLACK_WEBHOOK_URL, formatAlert(r, 'up'));
+    await postSlack(env, formatAlert(r, 'up'));
     return;
   }
 
@@ -190,7 +194,7 @@ async function processResult(env: Env, r: CheckResult) {
   if (pendingFails !== DOWN_THRESHOLD) {
     await env.STATE.put(pendingKey, String(DOWN_THRESHOLD));
   }
-  await postSlack(env.ALERT_SLACK_WEBHOOK_URL, formatAlert(r, 'down'));
+  await postSlack(env, formatAlert(r, 'down'));
 }
 
 function formatAlert(r: CheckResult, newState: 'up' | 'down'): string {
@@ -204,17 +208,31 @@ function formatAlert(r: CheckResult, newState: 'up' | 'down'): string {
   return `:white_check_mark: *${r.name}* back UP (${r.durationMs}ms)`;
 }
 
-async function postSlack(url: string, text: string) {
+async function postSlack(env: Env, text: string) {
+  const identity = { username: 'Confide Heartbeat', icon_emoji: ':heartbeat:' };
+  const token = env.SLACK_ALERTS_BOT_TOKEN?.trim();
+  const channel = env.SLACK_ALERTS_CHANNEL_ID?.trim();
+  if (token && channel) {
+    try {
+      const res = await fetch('https://slack.com/api/chat.postMessage', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json; charset=utf-8', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ channel, text, ...identity, unfurl_links: false }),
+      });
+      const body = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (body?.ok) return;
+      console.error('postSlack: bot post failed, using the webhook', body?.error ?? res.status);
+    } catch (err) {
+      console.error('postSlack: bot post threw, using the webhook', err);
+    }
+  }
+  const url = env.ALERT_SLACK_WEBHOOK_URL;
   if (!url) return;
   try {
     await fetch(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        text,
-        username: 'Confide Heartbeat',
-        icon_emoji: ':heartbeat:',
-      }),
+      body: JSON.stringify({ text, ...identity }),
     });
   } catch (err) {
     // Best effort. If Slack is the thing that's down, we can't tell anyone.

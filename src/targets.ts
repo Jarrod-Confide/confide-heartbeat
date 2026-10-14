@@ -60,4 +60,65 @@ export const TARGETS: Target[] = [
     expectStatus: 307,
     timeout: 15_000,
   },
+  {
+    name: 'event-registration',
+    // Public, attendee-facing registration domain (CISO Society branding),
+    // served by the EventFlow app on its own Vercel domain. This is the
+    // surface CISOs actually hit to register, distinct from the staff ops
+    // app at eventflow.confide.group (and its events.confide.group alias,
+    // which just 307s to the staff /sign-in).
+    //
+    // There's no stable /register or health route — registration lives at
+    // per-event slugs — so we probe the root. The app renders its OWN 404
+    // there (HTTP 404 with the EventFlow HTML shell), which proves the app
+    // is up and serving. We therefore expect 404 AND require the EventFlow
+    // marker in the body: a genuine outage returns a *different* 404
+    // (Vercel's DEPLOYMENT_NOT_FOUND, no EventFlow HTML) or a 5xx, both of
+    // which fail this check.
+    url: 'https://events.thecisosociety.com/',
+    expectStatus: 404,
+    expectBody: 'EventFlow',
+    timeout: 15_000,
+  },
+  {
+    name: 'meq',
+    // Purpose-built health route (public in middleware) that pings all three
+    // DBs — meq, eventflow, slackle — and returns 200 {"ok":true} only if
+    // every dependency is reachable, else 503. Catches DB outages, not just
+    // "is the Next.js process alive".
+    url: 'https://meq.confide.group/api/health',
+    expectStatus: 200,
+    expectBody: '"ok":true',
+    timeout: 15_000,
+  },
+  {
+    name: 'catalyst',
+    // Customer-facing, so an outage here is seen by CISOs and vendors, not
+    // just staff. /api/health checks the Supabase connection and returns
+    // {"ok":true,"db":"up"}, so a dead pooler trips it, not just a dead app.
+    url: 'https://catalyst.confide.group/api/health',
+    expectStatus: 200,
+    expectBody: '"ok":true',
+    timeout: 15_000,
+  },
+  {
+    name: 'pulse',
+    // Same health route shape as Catalyst. Pulse is a dependency of the other
+    // apps' feedback flows, so its outages are felt second-hand elsewhere.
+    url: 'https://pulse.confide.group/api/health',
+    expectStatus: 200,
+    expectBody: '"ok":true',
+    timeout: 15_000,
+  },
+  {
+    name: 'confide-apps',
+    // The apps.confide.group directory. It has no database, so the health
+    // route only proves the app is serving -- which is all there is to prove.
+    // It also renders this worker's own status snapshot, so when it is down
+    // the estate loses its status page as well as its launcher.
+    url: 'https://apps.confide.group/api/health',
+    expectStatus: 200,
+    expectBody: '"ok":true',
+    timeout: 15_000,
+  },
 ];
