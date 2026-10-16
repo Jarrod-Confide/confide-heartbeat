@@ -47,13 +47,6 @@ export const TARGETS: Target[] = [
     timeout: 15_000,
   },
   {
-    name: 'circlehub',
-    url: 'https://circlehub-pi.vercel.app/api/health',
-    expectStatus: 200,
-    expectBody: '"status":"ok"',
-    timeout: 15_000,
-  },
-  {
     name: 'eventflow',
     // Root redirects to login (307) — confirms the app and Vercel are alive.
     url: 'https://eventflow.confide.group/',

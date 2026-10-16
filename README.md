@@ -8,7 +8,6 @@ Cloudflare Worker that pings every Confide service every minute and posts to `#s
 
 - `slackle-web` — Slackle backend on Railway (`/readyz` — checks DB, Redis, Circle cable)
 - `slackle-mapping-ui` — Slackle admin UI on Vercel (`/sign-in`)
-- `circlehub` — HubSpot ↔ Circle sync on Vercel (`/api/health`)
 - `eventflow` — EventFlow staff ops app on Vercel (root, expects 307 → `/sign-in`)
 - `event-registration` — public attendee registration host `events.thecisosociety.com` (root; expects a 404 whose body contains `EventFlow`, so a platform outage is distinguishable from the app's own 404)
 - `meq` — MEQ on Vercel (`/api/health` — pings the meq, eventflow, and slackle DBs)
